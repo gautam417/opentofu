@@ -217,6 +217,10 @@ var DescriptionList = map[string]descriptionEntry{
 		Description:      "`flatten` takes a list and replaces any elements that are lists with a flattened sequence of the list contents.",
 		ParamDescription: []string{""},
 	},
+	"flipsensitive": {
+		Description:      "`flipsensitive` takes any value and returns a copy of it with its sensitivity toggled. If the input is sensitive, it returns a non-sensitive version, and if the input is not sensitive, it returns a sensitive version.",
+		ParamDescription: []string{""},
+	},
 	"floor": {
 		Description:      "`floor` returns the closest whole number that is less than or equal to the given value, which may be a fraction.",
 		ParamDescription: []string{""},

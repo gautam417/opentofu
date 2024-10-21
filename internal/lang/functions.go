@@ -117,6 +117,7 @@ func (s *Scope) Functions() map[string]function.Function {
 			"sensitive":        funcs.SensitiveFunc,
 			"nonsensitive":     funcs.NonsensitiveFunc,
 			"issensitive":      funcs.IsSensitiveFunc,
+			"flipsensitive":    funcs.FlipSensitiveFunc,
 			"setintersection":  stdlib.SetIntersectionFunc,
 			"setproduct":       stdlib.SetProductFunc,
 			"setsubtract":      stdlib.SetSubtractFunc,

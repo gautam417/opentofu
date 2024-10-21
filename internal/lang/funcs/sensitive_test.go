@@ -236,3 +236,217 @@ func TestIsSensitive(t *testing.T) {
 		})
 	}
 }
+
+func TestFlipSensitive(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    cty.Value
+		expected cty.Value
+	}{
+		{
+			name:     "non-sensitive to sensitive string",
+			input:    cty.StringVal("hello"),
+			expected: cty.StringVal("hello").Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive string",
+			input:    cty.StringVal("secret").Mark(marks.Sensitive),
+			expected: cty.StringVal("secret"),
+		},
+		{
+			name:     "non-sensitive to sensitive number",
+			input:    cty.NumberIntVal(42),
+			expected: cty.NumberIntVal(42).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive number",
+			input:    cty.NumberIntVal(42).Mark(marks.Sensitive),
+			expected: cty.NumberIntVal(42),
+		},
+		{
+			name:     "non-sensitive to sensitive bool",
+			input:    cty.BoolVal(true),
+			expected: cty.BoolVal(true).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive bool",
+			input:    cty.BoolVal(false).Mark(marks.Sensitive),
+			expected: cty.BoolVal(false),
+		},
+		{
+			name:     "non-sensitive to sensitive list",
+			input:    cty.ListVal([]cty.Value{cty.StringVal("a"), cty.StringVal("b")}),
+			expected: cty.ListVal([]cty.Value{cty.StringVal("a"), cty.StringVal("b")}).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive list",
+			input:    cty.ListVal([]cty.Value{cty.StringVal("a"), cty.StringVal("b")}).Mark(marks.Sensitive),
+			expected: cty.ListVal([]cty.Value{cty.StringVal("a"), cty.StringVal("b")}),
+		},
+		{
+			name:     "non-sensitive to sensitive map",
+			input:    cty.MapVal(map[string]cty.Value{"key": cty.StringVal("value")}),
+			expected: cty.MapVal(map[string]cty.Value{"key": cty.StringVal("value")}).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive map",
+			input:    cty.MapVal(map[string]cty.Value{"key": cty.StringVal("value")}).Mark(marks.Sensitive),
+			expected: cty.MapVal(map[string]cty.Value{"key": cty.StringVal("value")}),
+		},
+		{
+			name:     "non-sensitive to sensitive empty list",
+			input:    cty.ListValEmpty(cty.String),
+			expected: cty.ListValEmpty(cty.String).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive empty map",
+			input:    cty.MapValEmpty(cty.String).Mark(marks.Sensitive),
+			expected: cty.MapValEmpty(cty.String),
+		},
+		{
+			name:     "non-sensitive to sensitive null",
+			input:    cty.NullVal(cty.String),
+			expected: cty.NullVal(cty.String).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive null",
+			input:    cty.NullVal(cty.String).Mark(marks.Sensitive),
+			expected: cty.NullVal(cty.String),
+		},
+		{
+			name:     "non-sensitive to sensitive unknown",
+			input:    cty.UnknownVal(cty.String),
+			expected: cty.UnknownVal(cty.String).Mark(marks.Sensitive),
+		},
+		{
+			name:     "sensitive to non-sensitive unknown",
+			input:    cty.UnknownVal(cty.String).Mark(marks.Sensitive),
+			expected: cty.UnknownVal(cty.String),
+		},
+		{
+			name:     "nested structure non-sensitive to sensitive",
+			input:    cty.ObjectVal(map[string]cty.Value{"a": cty.ListVal([]cty.Value{cty.StringVal("nested")})}),
+			expected: cty.ObjectVal(map[string]cty.Value{"a": cty.ListVal([]cty.Value{cty.StringVal("nested")})}).Mark(marks.Sensitive),
+		},
+		{
+			name:     "nested structure sensitive to non-sensitive",
+			input:    cty.ObjectVal(map[string]cty.Value{"a": cty.ListVal([]cty.Value{cty.StringVal("nested")})}).Mark(marks.Sensitive),
+			expected: cty.ObjectVal(map[string]cty.Value{"a": cty.ListVal([]cty.Value{cty.StringVal("nested")})}),
+		},
+		{
+			name:     "extreme number value non-sensitive to sensitive",
+			input:    cty.NumberFloatVal(1e100),
+			expected: cty.NumberFloatVal(1e100).Mark(marks.Sensitive),
+		},
+		{
+			name:     "empty string non-sensitive to sensitive",
+			input:    cty.StringVal(""),
+			expected: cty.StringVal("").Mark(marks.Sensitive),
+		},
+		{
+			name:     "preserve other marks when making sensitive",
+			input:    cty.StringVal("marked").Mark("custom"),
+			expected: cty.StringVal("marked").Mark("custom").Mark(marks.Sensitive),
+		},
+		{
+			name:     "preserve other marks when making non-sensitive",
+			input:    cty.StringVal("marked").Mark("custom").Mark(marks.Sensitive),
+			expected: cty.StringVal("marked").Mark("custom"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FlipSensitive(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+
+			if !got.RawEquals(tt.expected) {
+				t.Errorf("FlipSensitive() = %#v, want %#v", got, tt.expected)
+			}
+
+			// Check sensitivity
+			if marks.Has(got, marks.Sensitive) != marks.Has(tt.expected, marks.Sensitive) {
+				t.Errorf("FlipSensitive() sensitivity mismatch: got %v, want %v", 
+					marks.Has(got, marks.Sensitive), marks.Has(tt.expected, marks.Sensitive))
+			}
+		})
+	}
+}
+
+func TestFlipSensitiveWithMarks(t *testing.T) {
+	const customMark = "custom"
+
+	tests := []struct {
+		name     string
+		input    cty.Value
+		expected cty.Value
+		checkFn  func(t *testing.T, got cty.Value)
+	}{
+		{
+			name:     "non-sensitive to sensitive",
+			input:    cty.StringVal("hello"),
+			expected: cty.StringVal("hello").Mark(marks.Sensitive),
+			checkFn: func(t *testing.T, got cty.Value) {
+				if !marks.Has(got, marks.Sensitive) {
+					t.Errorf("FlipSensitive() result is not sensitive")
+				}
+			},
+		},
+		{
+			name:     "sensitive to non-sensitive",
+			input:    cty.StringVal("secret").Mark(marks.Sensitive),
+			expected: cty.StringVal("secret"),
+			checkFn: func(t *testing.T, got cty.Value) {
+				if marks.Has(got, marks.Sensitive) {
+					t.Errorf("FlipSensitive() result is unexpectedly sensitive")
+				}
+			},
+		},
+		{
+			name:     "preserve custom mark when flipping to non-sensitive",
+			input:    cty.StringVal("multi-marked").Mark(customMark).Mark(marks.Sensitive),
+			expected: cty.StringVal("multi-marked").Mark(customMark),
+			checkFn: func(t *testing.T, got cty.Value) {
+				if marks.Has(got, marks.Sensitive) {
+					t.Errorf("FlipSensitive() result is unexpectedly sensitive")
+				}
+				if !got.HasMark(customMark) {
+					t.Errorf("FlipSensitive() did not preserve custom mark")
+				}
+			},
+		},
+		{
+			name:     "preserve custom mark when flipping to sensitive",
+			input:    cty.StringVal("multi-marked").Mark(customMark),
+			expected: cty.StringVal("multi-marked").Mark(customMark).Mark(marks.Sensitive),
+			checkFn: func(t *testing.T, got cty.Value) {
+				if !marks.Has(got, marks.Sensitive) {
+					t.Errorf("FlipSensitive() result is not sensitive")
+				}
+				if !got.HasMark(customMark) {
+					t.Errorf("FlipSensitive() did not preserve custom mark")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FlipSensitive(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+
+			if !got.RawEquals(tt.expected) {
+				t.Errorf("FlipSensitive() = %#v, want %#v", got, tt.expected)
+			}
+
+			if tt.checkFn != nil {
+				tt.checkFn(t, got)
+			}
+		})
+	}
+}
+
